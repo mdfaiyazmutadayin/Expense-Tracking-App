@@ -36,13 +36,69 @@ public $colors = [
 "#F43F5E", // Rose
 ];
 
+protected function rules(): array
+{
+    return [
+        'name' => 'required|string|max:255|unique:categories,name,' . ($this->editingId ?: 'NULL') . ',id,user_id,' . auth()->id(),
+
+        'color' => 'required|string',
+
+        'icon' => 'nullable|string|max:255',
+    ];
+}
+
+protected $messages = [
+    'name.required' => 'Please enter a category name.',
+
+    'name.unique' => 'You already have a category with this name.',
+
+    'color.required' => 'Please select a color.',
+];
+
 #[Computed]
 public function categories()
 {
     return Category::withCount('expenses')
-        ->where('user_id', auth()->id)
+        ->where('user_id', auth()->user()->id)
         ->orderBy('name')
         ->get();
+}
+
+public function edit($categoryId): void
+{
+    $category = Category::findOrFail($categoryId);
+
+    if ($category->user_id !== auth()->id()) {
+        abort(403);
+    }
+
+    $this->editingId = $category->id;
+    $this->name = $category->name;
+    $this->color = $category->color;
+    $this->icon = $category->icon;
+
+    $this->isEditing = true;
+}
+
+public function save(): void
+{
+    $this->validate();
+
+    Category::create([
+    'user_id' => auth()->id(),
+    'name' => $this->name,
+    'color' => $this->color,
+    'icon' => $this->icon,
+]);
+session()->flash('message', 'Category created successfully.');
+
+$this->reset([
+    'name',
+    'color',
+    'icon',
+    'editingId',
+    'isEditing',
+]);
 }
    public function render(): View
 {
